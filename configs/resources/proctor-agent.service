@@ -1,0 +1,16 @@
+[Unit]
+Description=Proctor Student Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/proctor/agent
+ExecStart=/opt/proctor/agent/proctor-agent run -config /opt/proctor/agent/agent.json
+Restart=always
+RestartSec=3
+EnvironmentFile=-/opt/proctor/agent/agent.env
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

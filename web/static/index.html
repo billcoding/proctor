@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Proctor 课堂监管</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">P</div>
+        <div>
+          <div class="brand-name">Proctor</div>
+          <div class="brand-sub">课堂监管控制台</div>
+        </div>
+      </div>
+      <nav>
+        <button class="nav-item active" data-view="dashboard">总览</button>
+        <button class="nav-item" data-view="agents">学生机</button>
+        <button class="nav-item" data-view="monitor">监控</button>
+        <button class="nav-item" data-view="files">文件</button>
+        <button class="nav-item" data-view="terminal">终端</button>
+        <button class="nav-item" data-view="alerts">告警</button>
+        <button class="nav-item" data-view="commands">指令</button>
+        <button class="nav-item" data-view="policies">策略</button>
+        <button class="nav-item" data-view="updates">版本管理</button>
+      </nav>
+      <div class="token-box">
+        <label>管理令牌</label>
+        <input id="token" type="password" value="proctor-admin" />
+        <button id="saveToken" class="btn ghost">保存</button>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <h1 id="viewTitle">总览</h1>
+        <div class="top-actions">
+          <label class="refresh-ctl hidden" title="仅监控页自动刷新">
+            <span class="muted">自动刷新</span>
+            <select id="refreshInterval">
+              <option value="3">3 秒</option>
+              <option value="5" selected>5 秒</option>
+              <option value="10">10 秒</option>
+              <option value="15">15 秒</option>
+              <option value="30">30 秒</option>
+              <option value="0">关闭</option>
+            </select>
+          </label>
+          <span id="clock" class="muted"></span>
+          <button id="refreshBtn" class="btn">刷新</button>
+        </div>
+      </header>
+
+      <section id="view-dashboard" class="view">
+        <div class="stat-grid" id="statGrid"></div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>学生机一览</h2>
+          </div>
+          <div id="dashAgents" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section id="view-agents" class="view hidden">
+        <div class="picker-layout">
+          <div class="panel picker-panel">
+            <div class="panel-head picker-head">
+              <h2>学生机</h2>
+              <select id="agentsAgentSelect" class="picker-select" aria-label="选择学生机">
+                <option value="">选择学生机…</option>
+              </select>
+            </div>
+            <div id="agentsList" class="table-wrap"></div>
+            <div id="agentDetail">
+              <div class="empty">选择一台学生机查看详情</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-monitor" class="view hidden">
+        <div class="picker-layout monitor-layout">
+          <div class="panel picker-panel monitor-panel">
+            <div class="panel-head picker-head monitor-picker-head">
+              <h2>学生机</h2>
+              <select id="monitorAgentSelect" class="picker-select monitor-select" aria-label="选择学生机">
+                <option value="">选择学生机…</option>
+              </select>
+            </div>
+            <div id="monitorDetail">
+              <div class="empty">选择一台学生机查看监控数据</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-files" class="view hidden">
+        <div class="picker-layout">
+          <div class="panel picker-panel">
+            <div class="panel-head picker-head">
+              <h2>学生机</h2>
+              <select id="filesAgentSelect" class="picker-select" aria-label="选择学生机">
+                <option value="">选择学生机…</option>
+              </select>
+            </div>
+            <div class="panel-head">
+              <h2>远程文件</h2>
+              <div class="top-actions">
+                <label class="fs-readonly-toggle" id="fsReadOnlyLabel" title="当前为只读，关闭后可修改">
+                  <input id="fsReadOnlyToggle" type="checkbox" checked />
+                  <span class="fs-readonly-switch" aria-hidden="true"></span>
+                  <span class="fs-readonly-text">只读</span>
+                </label>
+                <button id="fsUpBtn" class="btn small">上级</button>
+                <button id="fsRefreshBtn" class="btn small">刷新</button>
+                <button id="fsMkdirBtn" class="btn small" title="当前为只读，关闭后可修改">新建文件夹</button>
+                <label id="fsUploadBtn" class="btn small fs-upload-btn" title="当前为只读，关闭后可修改">上传<input id="fsUploadInput" type="file" hidden /></label>
+              </div>
+            </div>
+            <div class="fs-toolbar">
+              <div id="fsBreadcrumb" class="fs-breadcrumb muted">未选择学生机</div>
+              <div class="fs-toolbar-right">
+                <span id="fsReadOnlyHint" class="muted fs-readonly-hint">当前为只读，关闭后可修改</span>
+                <div id="fsStatus" class="muted"></div>
+              </div>
+            </div>
+            <div id="fsListing" class="table-wrap">
+              <div class="empty">请先选择学生机</div>
+            </div>
+            <div id="fsPreview" class="fs-preview hidden"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-terminal" class="view hidden">
+        <div class="picker-layout">
+          <div class="panel picker-panel term-panel">
+            <div class="panel-head picker-head">
+              <h2>学生机</h2>
+              <select id="termAgentSelect" class="picker-select" aria-label="选择学生机">
+                <option value="">选择学生机…</option>
+              </select>
+            </div>
+            <div id="termEmpty" class="empty">选择一台学生机后可连接终端</div>
+            <div id="termWorkspace" class="term-workspace hidden">
+              <div class="panel-head">
+                <h2>远程终端</h2>
+                <div class="top-actions">
+                  <button id="termConnectBtn" class="btn small primary">连接</button>
+                  <button id="termDisconnectBtn" class="btn small danger">断开</button>
+                </div>
+              </div>
+              <div class="term-config">
+                <div class="form-row">
+                  <label>模式
+                    <select id="termMode">
+                      <option value="agent">Agent 终端（推荐，经心跳反向接入）</option>
+                      <option value="ssh">SSH 直连（需学生机开 SSH 且网络可达）</option>
+                    </select>
+                  </label>
+                </div>
+                <div id="sshFields" class="form-row hidden">
+                  <label>主机<input id="sshHost" placeholder="默认学生机 IP" /></label>
+                  <label>端口<input id="sshPort" type="number" value="22" /></label>
+                  <label>用户<input id="sshUser" placeholder="root / Administrator" /></label>
+                  <label>密码<input id="sshPassword" type="password" placeholder="SSH 密码" /></label>
+                </div>
+                <div id="termHint" class="muted">选择模式后点击连接。Agent 模式最多等待一次心跳周期。</div>
+              </div>
+              <div id="termContainer" class="term-container"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-alerts" class="view hidden">
+        <div class="panel">
+          <div class="panel-head alert-panel-head">
+            <div class="alert-panel-head-main">
+              <h2>近期告警</h2>
+              <div class="top-actions">
+                <div class="alert-retention">
+                  <label>每台机器保留条数
+                    <input id="alertRetentionLimit" type="number" min="10" max="10000" step="1" value="200" />
+                  </label>
+                  <button id="saveAlertRetentionBtn" class="btn small primary" type="button">保存</button>
+                </div>
+                <button id="alertsRefreshBtn" class="btn" type="button">刷新</button>
+              </div>
+            </div>
+            <p class="alert-retention-hint">按每台机器计，超出删除更旧记录</p>
+          </div>
+          <div class="alert-filter-bar">
+            <input id="alertFilter" class="alert-filter" type="search"
+              placeholder="筛选级别 / 类别 / 学生机 / 内容 / 时间" autocomplete="off" />
+          </div>
+          <div id="alertList" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section id="view-policies" class="view hidden">
+        <div class="split">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>策略列表</h2>
+              <button id="newPolicyBtn" class="btn">新建</button>
+            </div>
+            <div id="policyList" class="table-wrap"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>策略编辑</h2>
+              <div class="top-actions">
+                <button id="deletePolicyBtn" class="btn danger">删除</button>
+                <button id="savePolicyBtn" class="btn primary">保存</button>
+              </div>
+            </div>
+            <form id="policyForm" class="form-grid"></form>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-commands" class="view hidden">
+        <div class="panel">
+          <div class="panel-head alert-panel-head">
+            <div class="alert-panel-head-main">
+              <h2>指令历史</h2>
+              <div class="top-actions">
+                <div class="alert-retention">
+                  <label>每台机器保留天数
+                    <input id="commandRetentionDays" type="number" min="1" max="365" step="1" value="7" />
+                  </label>
+                  <button id="saveCommandRetentionBtn" class="btn small primary" type="button">保存</button>
+                </div>
+                <button id="commandsRefreshBtn" class="btn" type="button">刷新</button>
+              </div>
+            </div>
+            <p class="alert-retention-hint">按每台机器计，超过天数删除更旧指令（非全库统一条数）</p>
+          </div>
+          <div id="commandList" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section id="view-updates" class="view hidden">
+        <div class="panel">
+          <div class="panel-head alert-panel-head">
+            <div class="alert-panel-head-main">
+              <h2>版本管理</h2>
+              <div class="top-actions">
+                <button id="updatesRefreshBtn" class="btn" type="button">刷新</button>
+              </div>
+            </div>
+            <p class="alert-retention-hint">管理已发布的 Agent 版本，并可向学生机下发升级</p>
+          </div>
+          <div class="updates-latest-bar">
+            <span class="muted">当前最新</span>
+            <strong id="updatesLatestHint" class="updates-latest-value">—</strong>
+          </div>
+          <div class="updates-toolbar">
+            <label class="updates-toolbar-field">学生机
+              <select id="updateAgentSelect" class="picker-select" aria-label="选择学生机">
+                <option value="">选择学生机…</option>
+              </select>
+            </label>
+            <label class="updates-toolbar-field">目标版本
+              <select id="updateTargetVersion" class="picker-select" aria-label="选择版本">
+                <option value="">选择版本…</option>
+              </select>
+            </label>
+            <div class="updates-toolbar-actions">
+              <button id="updateAgentBtn" class="btn small primary" type="button">升级</button>
+              <button id="updateAllOnlineBtn" class="btn small" type="button">升级全部在线</button>
+            </div>
+          </div>
+          <div id="updatesList" class="table-wrap"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

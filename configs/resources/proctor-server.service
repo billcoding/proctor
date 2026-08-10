@@ -1,0 +1,16 @@
+[Unit]
+Description=Proctor Teacher Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/proctor/server
+ExecStart=/opt/proctor/server/proctor-server -config /opt/proctor/server/server.json
+Restart=always
+RestartSec=3
+EnvironmentFile=-/opt/proctor/server/server.env
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

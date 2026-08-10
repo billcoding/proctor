@@ -1,0 +1,11 @@
+{
+  "listen": ":8911",
+  "data_dir": "./data",
+  "db_path": "./data/proctor.db",
+  "static_dir": "./web/static",
+  "admin_token": "proctor-admin",
+  "agent_token": "",
+  "basic_auth_user": "proctor",
+  "basic_auth_password": "proctor",
+  "online_after_sec": 45
+}

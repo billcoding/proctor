@@ -1,0 +1,13 @@
+{
+  "server_url": "http://127.0.0.1:8911",
+  "agent_id": "",
+  "agent_token": "",
+  "student_name": "",
+  "classroom": "",
+  "collect_interval_sec": 5,
+  "top_n_processes": 30,
+  "data_dir": "",
+  "log_file": "",
+  "insecure_skip_verify": false,
+  "auto_update": false
+}

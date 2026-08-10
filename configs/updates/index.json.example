@@ -1,0 +1,17 @@
+{
+  "latest": "0.2.0",
+  "versions": [
+    {
+      "version": "0.2.0",
+      "notes": "example index — place at <server data_dir>/updates/index.json",
+      "force": false,
+      "created_at": "2026-08-10T00:00:00Z"
+    },
+    {
+      "version": "0.1.0",
+      "notes": "previous release",
+      "force": false,
+      "created_at": "2026-07-01T00:00:00Z"
+    }
+  ]
+}

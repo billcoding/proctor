@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "force": false,
+  "notes": "example agent OTA manifest — place under <server data_dir>/updates/0.2.0/version.json",
+  "created_at": "2026-08-10T00:00:00Z",
+  "artifacts": {
+    "linux-amd64": {
+      "sha256": "",
+      "size": 0
+    },
+    "linux-arm64": {
+      "sha256": "",
+      "size": 0
+    },
+    "darwin-amd64": {
+      "sha256": "",
+      "size": 0
+    },
+    "darwin-arm64": {
+      "sha256": "",
+      "size": 0
+    },
+    "windows-amd64": {
+      "file": "proctor-agent-windows-amd64.exe",
+      "sha256": "",
+      "size": 0
+    }
+  }
+}
