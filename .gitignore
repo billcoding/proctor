@@ -30,3 +30,14 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+/bin/
+/dist/
+/data/
+*.db
+*.exe
+.DS_Store
+.idea/
+.vscode/
+*.log
+agent.id
