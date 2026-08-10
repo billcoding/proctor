@@ -1,10 +1,10 @@
 # Usage (Admin PowerShell):
-#   .\install-agent-windows.ps1 -BinPath .\proctor-agent.exe -ServerUrl http://teacher:8080 -Student "张三" -Classroom "高一1班"
+#   .\install-agent-windows.ps1 -BinPath .\proctor-agent.exe -ServerUrl http://teacher:8911 -Student "张三" -Classroom "高一1班"
 # Remote (via OpenSSH from deploy.sh):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File install-agent-windows.ps1 -BinPath C:\Windows\Temp\proctor-agent.exe ...
 param(
   [string]$BinPath = ".\proctor-agent.exe",
-  [string]$ServerUrl = "http://127.0.0.1:8080",
+  [string]$ServerUrl = "http://127.0.0.1:8911",
   [string]$Student = "",
   [string]$Classroom = "",
   [switch]$NoStart

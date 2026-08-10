@@ -162,9 +162,9 @@ EOF
   _u_cmd "./deploy.sh run server"  "本机跑教师端"
   _u_cmd "./deploy.sh deploy all"  "打 linux 发布包并写 OTA"
   _u_cmd "./deploy.sh publish_update -v 0.2.0" "仅发布 Agent 到 ./data/updates"
-  _u_cmd "sudo ./deploy.sh install agent --server-url http://10.0.0.2:8080 --student 张三"
-  _u_cmd "./deploy.sh remote_install agent -H root@192.168.1.10 --server-url http://10.0.0.2:8080"
-  _u_cmd "./deploy.sh remote_install agent -H Administrator@192.168.1.20 --os windows --server-url http://10.0.0.2:8080 --student 张三"
+  _u_cmd "sudo ./deploy.sh install agent --server-url http://10.0.0.2:8911 --student 张三"
+  _u_cmd "./deploy.sh remote_install agent -H root@192.168.1.10 --server-url http://10.0.0.2:8911"
+  _u_cmd "./deploy.sh remote_install agent -H Administrator@192.168.1.20 --os windows --server-url http://10.0.0.2:8911 --student 张三"
   echo
 }
 

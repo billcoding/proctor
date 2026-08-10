@@ -38,13 +38,13 @@ English: [README.md](./README.md)
 ./deploy.sh deploy all            # 打 linux 发布包 → dist/*.tar.gz；含 agent 时自动写 OTA → ./data/updates/
 ./deploy.sh publish_update -v 0.2.0   # 仅交叉编译 agent 并发布到 ./data/updates/
 sudo ./deploy.sh install server
-sudo ./deploy.sh install agent --server-url http://教师机IP:8080 --student "张三" --classroom "高一1班"
+sudo ./deploy.sh install agent --server-url http://教师机IP:8911 --student "张三" --classroom "高一1班"
 ./deploy.sh status
 # Linux 学生机（SSH + systemd）
-./deploy.sh remote_install agent -H root@学生机IP --server-url http://教师机IP:8080
+./deploy.sh remote_install agent -H root@学生机IP --server-url http://教师机IP:8911
 # Windows 学生机（需已启用 OpenSSH Server；管理员账号；自动探测或 --os windows）
 ./deploy.sh remote_install agent -H Administrator@学生机IP --os windows \
-  --server-url http://教师机IP:8080 --student "张三" --classroom "高一1班"
+  --server-url http://教师机IP:8911 --student "张三" --classroom "高一1班"
 ```
 
 可选：复制 `configs/.env.example` → `.env`（`REMOTE_SSH_*` / `REMOTE_OS` / `SERVER_URL` 等会自动加载）。
@@ -56,10 +56,10 @@ sudo ./deploy.sh install agent --server-url http://教师机IP:8080 --student "�
 ```bash
 make deps && make build
 ./bin/proctor-server -config ./configs/server.json
-./bin/proctor-agent run -server http://教师机IP:8080 -student "张三" -classroom "高一1班"
+./bin/proctor-agent run -server http://教师机IP:8911 -student "张三" -classroom "高一1班"
 ```
 
-浏览器打开 `http://127.0.0.1:8080`，会弹出 HTTP Basic Auth（默认 `proctor` / `proctor`）；进入后控制台还需管理令牌：`proctor-admin`。
+浏览器打开 `http://127.0.0.1:8911`，会弹出 HTTP Basic Auth（默认 `proctor` / `proctor`）；进入后控制台还需管理令牌：`proctor-admin`。
 
 ### 系统服务
 
@@ -73,7 +73,7 @@ make deps && make build
 
 | 字段 | 说明 |
 |------|------|
-| `listen` | 监听地址，默认 `:8080` |
+| `listen` | 监听地址，默认 `:8911` |
 | `admin_token` | Web/API 管理令牌 |
 | `basic_auth_user` / `basic_auth_password` | 控制台与管理 API 的 HTTP Basic Auth（默认 `proctor` / `proctor`）；密码为空则关闭 |
 | `agent_token` | 可选；设置后 Agent 须带 `X-Agent-Token` |

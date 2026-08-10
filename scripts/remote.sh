@@ -285,7 +285,7 @@ cmd_remote_install_windows(){
   server_url="$(config_set_get server_url)"
   student="$(config_set_get student_name)"
   classroom="$(config_set_get classroom)"
-  : "${server_url:=http://127.0.0.1:8080}"
+  : "${server_url:=http://127.0.0.1:8911}"
   log "remote_install agent (Windows Service) server_url=$server_url"
   # 路径用正斜杠，OpenSSH/PowerShell 均可识别；中文参数走 -File 参数传递
   local args=(

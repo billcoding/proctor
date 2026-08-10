@@ -38,13 +38,13 @@ Unified ops entry:
 ./deploy.sh deploy all            # linux packages → dist/*.tar.gz; with agent, also publish OTA → ./data/updates/
 ./deploy.sh publish_update -v 0.2.0   # cross-build agent and publish to ./data/updates/ only
 sudo ./deploy.sh install server
-sudo ./deploy.sh install agent --server-url http://TEACHER_IP:8080 --student "Alice" --classroom "Class-1"
+sudo ./deploy.sh install agent --server-url http://TEACHER_IP:8911 --student "Alice" --classroom "Class-1"
 ./deploy.sh status
 # Linux student host (SSH + systemd)
-./deploy.sh remote_install agent -H root@STUDENT_IP --server-url http://TEACHER_IP:8080
+./deploy.sh remote_install agent -H root@STUDENT_IP --server-url http://TEACHER_IP:8911
 # Windows student host (OpenSSH Server required; admin account; auto-detect or --os windows)
 ./deploy.sh remote_install agent -H Administrator@STUDENT_IP --os windows \
-  --server-url http://TEACHER_IP:8080 --student "Alice" --classroom "Class-1"
+  --server-url http://TEACHER_IP:8911 --student "Alice" --classroom "Class-1"
 ```
 
 Optional: copy `configs/.env.example` → `.env` (`REMOTE_SSH_*` / `REMOTE_OS` / `SERVER_URL`, etc. are loaded automatically).
@@ -56,10 +56,10 @@ Optional: copy `configs/.env.example` → `.env` (`REMOTE_SSH_*` / `REMOTE_OS` /
 ```bash
 make deps && make build
 ./bin/proctor-server -config ./configs/server.json
-./bin/proctor-agent run -server http://TEACHER_IP:8080 -student "Alice" -classroom "Class-1"
+./bin/proctor-agent run -server http://TEACHER_IP:8911 -student "Alice" -classroom "Class-1"
 ```
 
-Open `http://127.0.0.1:8080` in a browser. HTTP Basic Auth prompts first (default `proctor` / `proctor`); then use admin token `proctor-admin` in the console.
+Open `http://127.0.0.1:8911` in a browser. HTTP Basic Auth prompts first (default `proctor` / `proctor`); then use admin token `proctor-admin` in the console.
 
 ### System service
 
@@ -73,7 +73,7 @@ Open `http://127.0.0.1:8080` in a browser. HTTP Basic Auth prompts first (defaul
 
 | Field | Description |
 |------|------|
-| `listen` | Listen address, default `:8080` |
+| `listen` | Listen address, default `:8911` |
 | `admin_token` | Web/API admin token |
 | `basic_auth_user` / `basic_auth_password` | HTTP Basic Auth for console & management APIs (default `proctor` / `proctor`); empty password disables |
 | `agent_token` | Optional; when set, agents must send `X-Agent-Token` |

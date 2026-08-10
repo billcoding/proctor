@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: sudo ./install-agent-macos.sh /path/to/proctor-agent http://teacher:8080 "学生名" "教室"
+# Usage: sudo ./install-agent-macos.sh /path/to/proctor-agent http://teacher:8911 "学生名" "教室"
 BIN_SRC=${1:-./bin/proctor-agent}
-SERVER_URL=${2:-http://127.0.0.1:8080}
+SERVER_URL=${2:-http://127.0.0.1:8911}
 STUDENT=${3:-}
 CLASSROOM=${4:-}
 INSTALL_BIN=/usr/local/bin/proctor-agent
