@@ -41,3 +41,4 @@ go.work.sum
 .vscode/
 *.log
 agent.id
+USAGE.txt

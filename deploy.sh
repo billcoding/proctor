@@ -15,14 +15,36 @@ cd "$ROOT"
 source "$SCRIPTS/_lib.sh"
 load_workspace_dotenv "$ROOT"
 
-_DESC_COL=34
+# 两列帮助：左列按终端显示宽度对齐（中文宽字符按 2 列计）
+# _u_cmd 前导 1 空格、_u_opt 前导 2 空格，描述列起点均为 _DESC_COL+2
+_DESC_COL=40
 _u_cmd_sep=0
+_u_width(){
+  local s="$1"
+  local chars=${#s}
+  local LC_ALL=C
+  local bytes=${#s}
+  echo $(( chars + (bytes - chars) / 2 ))
+}
+_u_row(){
+  local lead="$1" left="$2" desc="${3:-}" col="$4"
+  local w pad
+  w="$(_u_width "$left")"
+  # 左列补齐到 col 个显示列，再留 1 个空格分隔描述
+  pad=$(( col - w + 1 ))
+  (( pad < 1 )) && pad=1
+  if [[ -z "$desc" ]]; then
+    printf "%*s%s\n" "$lead" "" "$left"
+  else
+    printf "%*s%s%*s%s\n" "$lead" "" "$left" "$pad" "" "$desc"
+  fi
+}
 _u_cmd(){
   if [[ "${_u_cmd_sep}" -eq 1 ]]; then echo; fi
   _u_cmd_sep=1
-  printf " %-$(( _DESC_COL ))s %s\n" "$1" "${2:-}"
+  _u_row 1 "$1" "${2:-}" "$_DESC_COL"
 }
-_u_opt(){ printf "  %-$(( _DESC_COL - 1 ))s %s\n" "$1" "${2:-}"; }
+_u_opt(){ _u_row 2 "$1" "${2:-}" "$((_DESC_COL - 1))"; }
 _u_group(){
   echo
   if [[ -n "${2:-}" ]]; then printf "%s: %s\n" "$1" "$2"
@@ -125,11 +147,15 @@ EOF
   _u_cmd "uninstall [组件]"        "停服务并移除（-X 清目录）"
 
   _u_group "service / status / log / clean"
+  _u_envs
+  _u_opt "DATA_DIR / UPDATES_DIR"  "clean -u 时使用（默认 ./data/updates）"
+  _u_opts
+  _u_opt "-u,--updates"           "clean 时同时清除 updates/"
   _u_cmds
   _u_cmd "service [组件] --start|--stop|--restart" "本机服务"
   _u_cmd "status [组件] [-V]"      "检查 dist / 安装 / 服务"
   _u_cmd "log [server|agent] [-f] [-n N]" "journalctl（Linux）"
-  _u_cmd "clean"                   "删除 dist/ bin/"
+  _u_cmd "clean [-u|--updates]"    "删除 dist/ bin/；-u 再清 updates/"
 
   _u_group "remote" "远程上传与部署（SSH；缺包先 package / Windows 先 build -W）"
   _u_envs

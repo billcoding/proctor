@@ -132,6 +132,7 @@ Examples:
 
 func defaultConfigPath() string {
 	candidates := []string{
+		`./configs/agent.json`,
 		"/etc/proctor/agent.json",
 		`C:\ProgramData\proctor\agent.json`,
 	}
