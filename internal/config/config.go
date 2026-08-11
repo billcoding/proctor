@@ -41,7 +41,7 @@ func DefaultAgent() AgentConfig {
 		CollectIntervalSec: 5,
 		TopNProcesses:      30,
 		DataDir:            defaultAgentDataDir(),
-		LogFile:            "",
+		LogFile:            "logs/agent.log",
 		AutoUpdate:         true,
 	}
 }
@@ -76,6 +76,7 @@ func LoadAgent(path string) (AgentConfig, error) {
 	if cfg.DataDir == "" {
 		cfg.DataDir = defaultAgentDataDir()
 	}
+	// Empty log_file: Runtime resolves to cwd/logs/agent.log (with service-cwd fallback).
 	return cfg, nil
 }
 

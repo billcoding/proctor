@@ -51,6 +51,7 @@
             </select>
           </label>
           <span id="clock" class="muted"></span>
+          <button id="broadcastBtn" class="btn primary" type="button" title="向全部在线学生机广播消息">广播</button>
           <button id="refreshBtn" class="btn">刷新</button>
         </div>
       </header>
@@ -73,6 +74,7 @@
               <select id="agentsAgentSelect" class="picker-select" aria-label="选择学生机">
                 <option value="">选择学生机…</option>
               </select>
+              <button id="agentsBroadcastBtn" class="btn small primary" type="button" title="向全部在线学生机广播消息">广播</button>
             </div>
             <div id="agentsList" class="table-wrap"></div>
             <div id="agentDetail">
@@ -281,6 +283,27 @@
       </section>
     </main>
   </div>
+
+  <div id="messageDialog" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-message-cancel></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="messageDialogTitle">
+      <div class="modal-head">
+        <h2 id="messageDialogTitle">发消息</h2>
+        <button type="button" class="btn ghost small" data-message-cancel aria-label="关闭">关闭</button>
+      </div>
+      <div class="modal-body">
+        <p class="muted message-dialog-hint" id="messageDialogHint"></p>
+        <label class="message-dialog-field">消息内容
+          <textarea id="messageDialogText" rows="4" placeholder="输入要发送给学生机的消息…"></textarea>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-message-cancel>取消</button>
+        <button type="button" class="btn primary" id="messageDialogSend">发送</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
   <script src="/app.js"></script>

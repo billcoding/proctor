@@ -165,7 +165,7 @@ type Command struct {
 	ID        string            `json:"id"`
 	AgentID   string            `json:"agent_id"`
 	Type      string            `json:"type"` // kill_process, refresh_policy, message, shutdown, restart, update
-	Payload   map[string]string `json:"payload,omitempty"`
+	Payload   map[string]string `json:"payload,omitempty"` // message: text, reply(optional, default true)
 	Status    string            `json:"status"` // pending, done, failed
 	Result    string            `json:"result,omitempty"`
 	CreatedAt time.Time         `json:"created_at"`

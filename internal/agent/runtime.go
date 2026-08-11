@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -27,9 +28,9 @@ type Runtime struct {
 	client     *Client
 	updater    *Updater
 
-	mu      sync.Mutex
-	cancel  context.CancelFunc
-	logFile *os.File
+	mu        sync.Mutex
+	cancel    context.CancelFunc
+	logCloser io.Closer
 }
 
 func NewRuntime(cfg config.AgentConfig, configPath string) (*Runtime, error) {
@@ -58,28 +59,22 @@ func NewRuntime(cfg config.AgentConfig, configPath string) (*Runtime, error) {
 }
 
 func (r *Runtime) setupLog() error {
-	if r.cfg.LogFile == "" {
-		return nil
+	// Default / empty / conventional relative path → cwd/logs/agent.log
+	// (falls back to <exeDir>/logs when service cwd is unusable).
+	// Any other log_file value is used as-is (absolute or relative).
+	path := strings.TrimSpace(r.cfg.LogFile)
+	if path == "" || path == "logs/agent.log" || path == filepath.FromSlash("logs/agent.log") {
+		path = resolveDefaultLogPath()
 	}
-	if err := os.MkdirAll(dirOf(r.cfg.LogFile), 0o755); err != nil {
-		return err
-	}
-	f, err := os.OpenFile(r.cfg.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	w, err := openDailyLog(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("open log %s: %w", path, err)
 	}
-	r.logFile = f
-	log.SetOutput(io.MultiWriter(os.Stderr, f))
+	r.logCloser = w
+	// Keep stderr (console/service journal) and file.
+	log.SetOutput(io.MultiWriter(os.Stderr, w))
+	log.Printf("logging to %s (daily rotate)", path)
 	return nil
-}
-
-func dirOf(path string) string {
-	for i := len(path) - 1; i >= 0; i-- {
-		if path[i] == '/' || path[i] == '\\' {
-			return path[:i]
-		}
-	}
-	return "."
 }
 
 func (r *Runtime) AgentID() string { return r.cfg.AgentID }
@@ -104,11 +99,11 @@ func (r *Runtime) Stop() error {
 		r.cancel()
 		r.cancel = nil
 	}
-	if r.logFile != nil {
-		_ = r.logFile.Close()
-		r.logFile = nil
-	}
 	log.Printf("proctor-agent stopped")
+	if r.logCloser != nil {
+		_ = r.logCloser.Close()
+		r.logCloser = nil
+	}
 	return nil
 }
 
@@ -237,14 +232,15 @@ func (r *Runtime) handleCommand(cmd model.Command) {
 	case "refresh_policy":
 		result.Result = "ok"
 	case "message":
-		msg := cmd.Payload["text"]
-		log.Printf("teacher message: %s", msg)
-		if err := showTeacherMessage(msg); err != nil {
-			result.Status = "failed"
-			result.Result = err.Error()
-		} else {
-			result.Result = "message shown"
+		msg := ""
+		if cmd.Payload != nil {
+			msg = cmd.Payload["text"]
 		}
+		allowReply := payloadBoolDefault(cmd.Payload, "reply", true)
+		log.Printf("teacher message: %s reply=%v", msg, allowReply)
+		// Dialog can block for minutes; never stall the heartbeat loop.
+		go r.handleTeacherMessage(cmd, msg, allowReply)
+		return
 	case "ping":
 		result.Result = "pong"
 	case "shutdown":
@@ -316,5 +312,52 @@ func (r *Runtime) handleCommand(cmd model.Command) {
 	}
 	if err := r.client.ReportCommand(result); err != nil {
 		log.Printf("report command failed: %v", err)
+	}
+}
+
+// handleTeacherMessage shows a confirm/reply dialog off the heartbeat path,
+// then reports the student's ack or short reply as the command result.
+func (r *Runtime) handleTeacherMessage(cmd model.Command, msg string, allowReply bool) {
+	// Mark done immediately so PendingCommands won't redeliver while the dialog is open.
+	_ = r.client.ReportCommand(model.CommandResult{
+		CommandID: cmd.ID,
+		AgentID:   r.cfg.AgentID,
+		Status:    "done",
+		Result:    "等待学生确认…",
+	})
+	result := model.CommandResult{
+		CommandID: cmd.ID,
+		AgentID:   r.cfg.AgentID,
+		Status:    "done",
+	}
+	out, err := showTeacherMessage(msg, allowReply)
+	if err != nil {
+		result.Status = "failed"
+		result.Result = err.Error()
+		log.Printf("teacher message dialog failed: %v", err)
+	} else {
+		result.Result = out
+		log.Printf("teacher message result: %s", out)
+	}
+	if err := r.client.ReportCommand(result); err != nil {
+		log.Printf("report command failed: %v", err)
+	}
+}
+
+func payloadBoolDefault(payload map[string]string, key string, def bool) bool {
+	if payload == nil {
+		return def
+	}
+	v, ok := payload[key]
+	if !ok {
+		return def
+	}
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "0", "false", "no", "off":
+		return false
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return def
 	}
 }

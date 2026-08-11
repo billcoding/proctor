@@ -25,7 +25,7 @@ func (p *program) Stop(s service.Service) error {
 }
 
 // ServiceConfig builds OS-specific service metadata.
-func ServiceConfig(exePath string, configPath string) *service.Config {
+func ServiceConfig(exePath string, configPath string, workingDir string) *service.Config {
 	args := []string{"run"}
 	if configPath != "" {
 		args = append(args, "-config", configPath)
@@ -37,6 +37,12 @@ func ServiceConfig(exePath string, configPath string) *service.Config {
 		Description: "Student computer audit agent for process/network/resource supervision",
 		Arguments:   args,
 		Option:      service.KeyValue{},
+	}
+	// Relative log_file (default logs/agent.log) resolves against this cwd.
+	if workingDir != "" {
+		cfg.WorkingDirectory = workingDir
+	} else if exePath != "" {
+		cfg.WorkingDirectory = filepath.Dir(exePath)
 	}
 
 	switch runtime.GOOS {
@@ -75,7 +81,14 @@ func NewService(cfg config.AgentConfig, configPath string) (service.Service, *Ru
 	} else if resolved, err2 := filepath.EvalSymlinks(exe); err2 == nil {
 		exe = resolved
 	}
-	svcCfg := ServiceConfig(exe, configPath)
+	// Prefer data_dir so logs/ under relative log_file is writable (esp. Windows
+	// Program Files / Linux /usr/local/bin installs). Packaged systemd units set
+	// WorkingDirectory=/opt/proctor/agent explicitly.
+	workDir := cfg.DataDir
+	if workDir == "" && exe != "" {
+		workDir = filepath.Dir(exe)
+	}
+	svcCfg := ServiceConfig(exe, configPath, workDir)
 	prg := &program{runtime: rt}
 	svc, err := service.New(prg, svcCfg)
 	if err != nil {

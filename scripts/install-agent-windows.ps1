@@ -40,7 +40,7 @@ Copy-Item -Force $BinPath $bin
   "collect_interval_sec": 15,
   "top_n_processes": 30,
   "data_dir": "C:\\ProgramData\\proctor\\data",
-  "log_file": "",
+  "log_file": "logs/agent.log",
   "insecure_skip_verify": false
 }
 "@ | Set-Content -Encoding UTF8 $conf

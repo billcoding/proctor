@@ -67,6 +67,8 @@ Open `http://127.0.0.1:8911` in a browser. HTTP Basic Auth prompts first (defaul
 - **Legacy scripts**: `scripts/install-agent-{linux,macos}.sh` / `install-agent-windows.ps1`
 - **Manual**: `proctor-agent install|start|stop|status|uninstall`
 
+Agent logs default to `logs/agent.log` under the process working directory (packaged systemd: `WorkingDirectory=/opt/proctor/agent`; built-in `install`: `data_dir`). If a service has no working directory, logs are relative to the process cwd.
+
 ## Configuration
 
 ### Server (`configs/server.json`)
@@ -89,7 +91,7 @@ Open `http://127.0.0.1:8911` in a browser. HTTP Basic Auth prompts first (defaul
 | `student_name` / `classroom` | Display info (console edits are not overwritten by heartbeat) |
 | `collect_interval_sec` | Local collect interval (may be overridden by policy) |
 | `data_dir` | Local data directory (agent ID, etc.) |
-| `log_file` | Optional log file path |
+| `log_file` | Log path (default `logs/agent.log` under cwd; empty uses the same, with fallback to `<exeDir>/logs/` if cwd is unusable). Current day is always `agent.log`; prior days archive as `agent.YYYY-MM-DD.log` |
 | `insecure_skip_verify` | Skip TLS verify for self-signed HTTPS |
 | `auto_update` | Enable OTA after heartbeat (default `true` for lab fleets; set `false` to disable) |
 

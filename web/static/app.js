@@ -27,6 +27,11 @@ const state = {
   monitorNets: [],
   alertFilter: localStorage.getItem("proctor_alert_filter") || "",
   alerts: [],
+  commands: [],
+  commandFilterAgent: localStorage.getItem("proctor_command_filter_agent") || "",
+  commandFilterType: localStorage.getItem("proctor_command_filter_type") || "",
+  commandFilterStatus: localStorage.getItem("proctor_command_filter_status") || "",
+  commandFilterKeyword: localStorage.getItem("proctor_command_filter_keyword") || "",
   refreshSec: Number(localStorage.getItem("proctor_refresh_sec") || 5),
   refreshTimer: null,
   refreshing: false,
@@ -318,7 +323,7 @@ async function showAgent(id) {
         <button class="btn small" data-act="files">管理文件</button>
         <button class="btn small" data-act="terminal">打开终端</button>
         <button class="btn small" data-act="ping">Ping</button>
-        <button class="btn small" data-act="message">发消息</button>
+        <button class="btn small" data-act="message" title="发送给当前学生机">发消息</button>
         <button class="btn small" data-act="shutdown">关机</button>
         <button class="btn small" data-act="restart">重启</button>
         <button class="btn small danger" data-act="delete">移除</button>
@@ -376,10 +381,7 @@ async function showAgent(id) {
           alert("已下发 ping");
         }
         if (act === "message") {
-          const text = prompt("发送给学生机的消息");
-          if (!text) return;
-          await sendCommand(id, "message", { text });
-          alert("已下发消息（学生机将弹窗提示）");
+          await sendTeacherMessage(id);
         }
         if (act === "upgrade") {
           const ver = ($("#metaUpgradeVersion")?.value || "").trim();
@@ -790,7 +792,7 @@ function renderMonitorHeader(agent) {
     <div class="actions">
       <button class="btn small" data-act="goto-agent">设备管理</button>
       <button class="btn small" data-act="ping">Ping</button>
-      <button class="btn small" data-act="message">发消息</button>
+      <button class="btn small" data-act="message" title="发送给当前学生机">发消息</button>
     </div>
   `;
 }
@@ -811,7 +813,7 @@ function renderMonitorTabBody({ activeTab, res, netIO, diskIO, disks, ifaces, pr
         <div class="metric-card up"><div class="label">上传</div><div class="value">${fmtSpeed(netIO.send_bps)}</div><div class="hint">累计 ${fmtBytes(netIO.bytes_sent)}</div></div>
         <div class="metric-card"><div class="label">收包</div><div class="value">${fmtPps(netIO.packets_recv_pps)}</div><div class="hint">累计 ${fmtNum(netIO.packets_recv)}</div></div>
         <div class="metric-card"><div class="label">发包</div><div class="value">${fmtPps(netIO.packets_sent_pps)}</div><div class="hint">累计 ${fmtNum(netIO.packets_sent)}</div></div>
-      </div>
+    </div>
       <div class="muted" style="margin-top:10px">连接 ESTABLISHED ${netIO.conn_established || 0} · LISTEN ${netIO.conn_listen || 0} · 上报 ${netIO.conn_total || 0}</div>
     </div>
     <div class="monitor-tab-panel detail-block${activeTab === "nics" ? "" : " hidden"}" data-tab="nics" role="tabpanel">
@@ -921,10 +923,7 @@ function ensureMonitorDelegates() {
         alert("已下发 ping");
       }
       if (act === "message") {
-        const text = prompt("发送给学生机的消息");
-        if (!text) return;
-        await sendCommand(agentId, "message", { text });
-        alert("已下发消息（学生机将弹窗提示）");
+        await sendTeacherMessage(agentId);
       }
     } catch (err) {
       alert(err.message);
@@ -1514,6 +1513,148 @@ async function sendCommand(agentId, type, payload) {
   });
 }
 
+function agentDisplayName(agentOrId) {
+  if (agentOrId && typeof agentOrId === "object") {
+    return agentOrId.student_name || agentOrId.hostname || agentOrId.id || "-";
+  }
+  const id = String(agentOrId || "");
+  const a = (state.agents || []).find((x) => x.id === id);
+  return a ? (a.student_name || a.hostname || a.id) : (id || "-");
+}
+
+function resolveMessageTargets(scope, currentAgentId) {
+  const agents = state.agents || [];
+  if (scope === "current") {
+    return currentAgentId ? [currentAgentId] : [];
+  }
+  if (scope === "online") {
+    return agents.filter((a) => a.online).map((a) => a.id);
+  }
+  return [];
+}
+
+function updateBroadcastTargetHint() {
+  const dialogHint = $("#messageDialogHint");
+  if (!dialogHint) return;
+  const onlineCount = resolveMessageTargets("online", null).length;
+  dialogHint.textContent = onlineCount
+    ? `将发送给全部在线学生机（当前在线 ${onlineCount} 台）`
+    : "当前没有在线学生机";
+}
+
+function openMessageDialog(currentAgentId, opts = {}) {
+  const dialog = $("#messageDialog");
+  if (!dialog) return Promise.resolve(null);
+
+  const broadcast = opts.mode === "broadcast";
+  const titleEl = $("#messageDialogTitle");
+  const hintEl = $("#messageDialogHint");
+  const sendBtn = $("#messageDialogSend");
+  const textEl = $("#messageDialogText");
+
+  if (titleEl) titleEl.textContent = broadcast ? "广播" : "发消息";
+  if (sendBtn) sendBtn.textContent = broadcast ? "广播" : "发送";
+
+  if (broadcast) {
+    updateBroadcastTargetHint();
+  } else if (hintEl) {
+    hintEl.textContent = currentAgentId
+      ? `发送给：${agentDisplayName(currentAgentId)}`
+      : "请先选择一台学生机";
+  }
+
+  if (textEl) textEl.value = "";
+
+  dialog.classList.remove("hidden");
+  dialog.setAttribute("aria-hidden", "false");
+  textEl?.focus();
+
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      dialog.classList.add("hidden");
+      dialog.setAttribute("aria-hidden", "true");
+      dialog.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+    const finish = (value) => {
+      cleanup();
+      resolve(value);
+    };
+    const onClick = (e) => {
+      if (e.target.closest("[data-message-cancel]")) {
+        finish(null);
+        return;
+      }
+      if (e.target.closest("#messageDialogSend")) {
+        const text = String(textEl?.value || "").trim();
+        if (!text) {
+          alert(broadcast ? "请输入广播内容" : "请输入消息内容");
+          textEl?.focus();
+          return;
+        }
+        if (broadcast) {
+          const targets = resolveMessageTargets("online", null);
+          if (!targets.length) {
+            alert("没有可发送的在线学生机");
+            return;
+          }
+          finish({ text, scope: "online", targets, broadcast: true });
+          return;
+        }
+        if (!currentAgentId) {
+          alert("请先选择一台学生机");
+          return;
+        }
+        finish({
+          text,
+          scope: "current",
+          targets: [currentAgentId],
+          broadcast: false,
+        });
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") finish(null);
+    };
+    dialog.addEventListener("click", onClick);
+    document.addEventListener("keydown", onKey);
+  });
+}
+
+async function sendTeacherMessage(currentAgentId, opts = {}) {
+  const choice = await openMessageDialog(currentAgentId, opts);
+  if (!choice) return;
+  const { text, targets, broadcast } = choice;
+  let ok = 0;
+  const errors = [];
+  await Promise.all(
+    targets.map(async (id) => {
+      try {
+        await sendCommand(id, "message", { text, reply: "true" });
+        ok += 1;
+      } catch (e) {
+        errors.push(`${agentDisplayName(id)}: ${e.message}`);
+      }
+    })
+  );
+  const fail = errors.length;
+  const action = broadcast ? "广播" : "消息";
+  const base =
+    `${action}完成：成功 ${ok} 台，失败 ${fail} 台（共 ${targets.length} 台）。` +
+    `学生机将弹出确认框，可回复；详情见「指令」页`;
+  alert(fail ? `${base}\n失败明细：\n${errors.slice(0, 8).join("\n")}${fail > 8 ? `\n…另有 ${fail - 8} 台` : ""}` : base);
+}
+
+async function broadcastTeacherMessage() {
+  try {
+    const { agents } = await api("/api/agents");
+    state.agents = agents || [];
+  } catch (_) {
+    /* 沿用现有缓存列表 */
+  }
+  return sendTeacherMessage(state.selectedAgentId || null, { mode: "broadcast" });
+}
+
 function matchesAlertFilter(q, alert) {
   const needle = String(q || "").trim().toLowerCase();
   if (!needle) return true;
@@ -1732,28 +1873,202 @@ async function deletePolicy() {
   await loadPolicies();
 }
 
+const COMMAND_TYPE_LABELS = {
+  message: "消息",
+  ping: "Ping",
+  kill_process: "结束进程",
+  refresh_policy: "刷新策略",
+  shutdown: "关机",
+  restart: "重启",
+  update: "升级",
+  upgrade: "升级",
+};
+
+const COMMAND_STATUS_LABELS = {
+  pending: "待投递",
+  delivered: "已投递",
+  done: "完成",
+  failed: "失败",
+};
+
+function commandTypeLabel(type) {
+  const t = String(type || "");
+  return COMMAND_TYPE_LABELS[t] || t || "-";
+}
+
+function commandStatusLabel(status) {
+  const s = String(status || "");
+  return COMMAND_STATUS_LABELS[s] || s || "-";
+}
+
+function commandPayloadText(c) {
+  const payload = c?.payload;
+  if (!payload || typeof payload !== "object") return "";
+  return Object.values(payload)
+    .map((v) => String(v ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+function matchesCommandFilters(c) {
+  const agent = String(state.commandFilterAgent || "").trim();
+  if (agent && String(c?.agent_id || "") !== agent) return false;
+
+  const type = String(state.commandFilterType || "").trim();
+  if (type) {
+    const ct = String(c?.type || "");
+    const matched = type === "update" ? ct === "update" || ct === "upgrade" : ct === type;
+    if (!matched) return false;
+  }
+
+  const status = String(state.commandFilterStatus || "").trim();
+  if (status && String(c?.status || "") !== status) return false;
+
+  const needle = String(state.commandFilterKeyword || "").trim().toLowerCase();
+  if (!needle) return true;
+  return matchesMonitorFilter(
+    needle,
+    c.agent_id,
+    c.type,
+    commandTypeLabel(c.type),
+    c.status,
+    commandStatusLabel(c.status),
+    commandPayloadText(c),
+    c.result,
+    formatCommandResultPlain(c),
+    fmtTime(c.created_at)
+  );
+}
+
+function formatCommandResultPlain(c) {
+  const raw = String(c?.result || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("reply:")) return raw.slice("reply:".length).trim() || raw;
+  const map = {
+    acked: "已确认（知道了）",
+    dismissed: "已关闭（未回复）",
+    timeout: "超时未确认",
+    shown: "已通知（无法回复）",
+    "等待学生确认…": "等待学生确认…",
+    "message shown": "已展示",
+  };
+  return map[raw] || raw;
+}
+
+function renderCommandAgentFilter() {
+  const sel = $("#commandFilterAgent");
+  if (!sel) return;
+  const selected = String(state.commandFilterAgent || "");
+  const byId = new Map((state.agents || []).map((a) => [a.id, a]));
+  for (const c of state.commands || []) {
+    const id = String(c?.agent_id || "").trim();
+    if (id && !byId.has(id)) byId.set(id, { id });
+  }
+  const agents = [...byId.values()].sort((a, b) =>
+    monitorAgentLabel(a).localeCompare(monitorAgentLabel(b), "zh")
+  );
+  const keepFocus = document.activeElement === sel;
+  sel.innerHTML =
+    `<option value="">全部</option>` +
+    agents.map((a) => `<option value="${escAttr(a.id)}">${esc(monitorAgentLabel(a))}</option>`).join("");
+  const next = selected && byId.has(selected) ? selected : "";
+  sel.value = next;
+  if (state.commandFilterAgent !== next) {
+    state.commandFilterAgent = next;
+    localStorage.setItem("proctor_command_filter_agent", next);
+  }
+  if (keepFocus) sel.focus();
+}
+
+function syncCommandFilterControls() {
+  const agentSel = $("#commandFilterAgent");
+  if (agentSel && document.activeElement !== agentSel) {
+    agentSel.value = state.commandFilterAgent || "";
+  }
+  const typeSel = $("#commandFilterType");
+  if (typeSel && document.activeElement !== typeSel) {
+    typeSel.value = state.commandFilterType || "";
+  }
+  const statusSel = $("#commandFilterStatus");
+  if (statusSel && document.activeElement !== statusSel) {
+    statusSel.value = state.commandFilterStatus || "";
+  }
+  const keyword = $("#commandFilterKeyword");
+  if (keyword && document.activeElement !== keyword) {
+    keyword.value = state.commandFilterKeyword || "";
+  }
+}
+
+function renderCommandRows(commands) {
+  const filtered = (commands || []).filter(matchesCommandFilters);
+  return table(
+    ["时间", "学生机", "类型", "状态", "结果"],
+    filtered.map((c) => [
+      fmtTime(c.created_at),
+      `<span class="mono">${esc(c.agent_id)}</span>`,
+      formatCommandType(c),
+      formatCommandStatus(c.status),
+      formatCommandResult(c),
+    ])
+  );
+}
+
+function applyCommandFilters() {
+  $("#commandList").innerHTML = renderCommandRows(state.commands);
+}
+
 async function loadCommands() {
-  const [commandsRes, retention] = await Promise.all([
+  const [commandsRes, retention, agentsRes] = await Promise.all([
     api("/api/commands"),
     api("/api/commands/retention"),
+    api("/api/agents").catch(() => ({ agents: state.agents || [] })),
   ]);
+  state.agents = agentsRes.agents || state.agents || [];
+  state.commands = commandsRes.commands || [];
   const input = $("#commandRetentionDays");
   if (input && document.activeElement !== input) {
     input.value = retention.days ?? commandsRes.days ?? 7;
     if (retention.min != null) input.min = retention.min;
     if (retention.max != null) input.max = retention.max;
   }
-  const commands = commandsRes.commands || [];
-  $("#commandList").innerHTML = table(
-    ["时间", "学生机", "类型", "状态", "结果"],
-    commands.map((c) => [
-      fmtTime(c.created_at),
-      `<span class="mono">${esc(c.agent_id)}</span>`,
-      esc(c.type),
-      esc(c.status),
-      esc(c.result || "-"),
-    ])
-  );
+  renderCommandAgentFilter();
+  syncCommandFilterControls();
+  applyCommandFilters();
+}
+
+function formatCommandType(c) {
+  const type = String(c?.type || "");
+  const label = commandTypeLabel(type);
+  if (type === "message") {
+    const text = String(c?.payload?.text || "").trim();
+    if (text) {
+      return `${esc(label)}<div class="muted" style="margin-top:4px;max-width:280px;white-space:pre-wrap;word-break:break-word">${esc(text)}</div>`;
+    }
+  }
+  return esc(label);
+}
+
+function formatCommandStatus(status) {
+  return esc(commandStatusLabel(status));
+}
+
+function formatCommandResult(c) {
+  const raw = String(c?.result || "").trim();
+  if (!raw) return "-";
+  if (raw.startsWith("reply:")) {
+    const reply = raw.slice("reply:".length).trim();
+    return `<span class="badge warn">学生回复</span><div style="margin-top:4px;max-width:320px;white-space:pre-wrap;word-break:break-word">${esc(reply || "-")}</div>`;
+  }
+  const map = {
+    acked: "已确认（知道了）",
+    dismissed: "已关闭（未回复）",
+    timeout: "超时未确认",
+    shown: "已通知（无法回复）",
+    "等待学生确认…": "等待学生确认…",
+    "message shown": "已展示",
+  };
+  if (map[raw]) return esc(map[raw]);
+  return esc(raw);
 }
 
 async function saveCommandRetention() {
@@ -1821,6 +2136,12 @@ $("#saveToken").addEventListener("click", () => {
   refresh();
 });
 $("#refreshBtn").addEventListener("click", () => refresh());
+$("#broadcastBtn")?.addEventListener("click", () => {
+  broadcastTeacherMessage().catch((e) => alert(e.message));
+});
+$("#agentsBroadcastBtn")?.addEventListener("click", () => {
+  broadcastTeacherMessage().catch((e) => alert(e.message));
+});
 $("#alertsRefreshBtn")?.addEventListener("click", () => {
   loadAlerts().catch((e) => alert("加载失败: " + e.message));
 });
@@ -1904,6 +2225,34 @@ $("#alertFilter")?.addEventListener("input", (e) => {
   localStorage.setItem("proctor_alert_filter", state.alertFilter);
   $("#alertList").innerHTML = renderAlertRows(state.alerts);
   bindAlertAckButtons();
+});
+$("#commandFilterAgent")?.addEventListener("change", (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLSelectElement)) return;
+  state.commandFilterAgent = t.value || "";
+  localStorage.setItem("proctor_command_filter_agent", state.commandFilterAgent);
+  applyCommandFilters();
+});
+$("#commandFilterType")?.addEventListener("change", (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLSelectElement)) return;
+  state.commandFilterType = t.value || "";
+  localStorage.setItem("proctor_command_filter_type", state.commandFilterType);
+  applyCommandFilters();
+});
+$("#commandFilterStatus")?.addEventListener("change", (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLSelectElement)) return;
+  state.commandFilterStatus = t.value || "";
+  localStorage.setItem("proctor_command_filter_status", state.commandFilterStatus);
+  applyCommandFilters();
+});
+$("#commandFilterKeyword")?.addEventListener("input", (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLInputElement)) return;
+  state.commandFilterKeyword = t.value;
+  localStorage.setItem("proctor_command_filter_keyword", state.commandFilterKeyword);
+  applyCommandFilters();
 });
 $("#agentsAgentSelect")?.addEventListener("change", () => {
   const id = $("#agentsAgentSelect").value;

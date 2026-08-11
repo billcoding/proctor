@@ -67,6 +67,8 @@ make deps && make build
 - **兼容旧脚本**：`scripts/install-agent-{linux,macos}.sh` / `install-agent-windows.ps1`
 - **手动**：`proctor-agent install|start|stop|status|uninstall`
 
+Agent 日志默认写在进程工作目录下的 `logs/agent.log`（打包的 systemd unit：`WorkingDirectory=/opt/proctor/agent`；内置 `install`：使用 `data_dir`）。若服务未设置工作目录，日志相对进程启动时的 cwd。
+
 ## 配置
 
 ### Server (`configs/server.json`)
@@ -89,7 +91,7 @@ make deps && make build
 | `student_name` / `classroom` | 展示信息（控制台可改，改后心跳不再覆盖） |
 | `collect_interval_sec` | 本地采集间隔（可被策略覆盖） |
 | `data_dir` | Agent ID 等本地数据目录 |
-| `log_file` | 可选日志文件路径 |
+| `log_file` | 日志路径（默认 cwd 下 `logs/agent.log`；留空同默认，若 cwd 不可用则回退到 `<exeDir>/logs/`）。当日始终写 `agent.log`，跨日归档为 `agent.YYYY-MM-DD.log` |
 | `insecure_skip_verify` | HTTPS 自签证书时跳过校验 |
 | `auto_update` | 是否启用心跳后自动 OTA（默认 `true`，便于机房；设为 `false` 可关闭） |
 

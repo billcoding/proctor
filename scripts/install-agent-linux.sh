@@ -27,7 +27,7 @@ cat >"$CONF_FILE" <<EOF
   "collect_interval_sec": 15,
   "top_n_processes": 30,
   "data_dir": "/var/lib/proctor",
-  "log_file": "",
+  "log_file": "logs/agent.log",
   "insecure_skip_verify": false
 }
 EOF
