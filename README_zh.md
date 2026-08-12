@@ -6,7 +6,7 @@ English: [README.md](./README.md)
 
 ## 功能
 
-- **进程管理**：进程列表、违规进程识别、远程结束、黑名单/白名单自动查杀
+- **进程管理**：进程列表、违规进程识别、远程结束、黑名单/白名单**定时查杀**（独立扫描间隔、生效时段、警告倒计时、冷却、告警联动）
 - **网络管理**：连接列表、受限域名告警（反查主机名匹配）
 - **系统资源**：CPU / 内存 / Load / 运行时长
 - **磁盘监管**：挂载点容量与使用率告警
@@ -180,3 +180,19 @@ scripts/           deploy 子脚本、unit 模板、旧安装脚本
 - 域名黑名单会结合反查主机名与 IP:port 做匹配，适合课堂轻量提醒，不是完整网关防火墙。
 - Linux 消息弹窗依赖 `zenity` 或 `notify-send`；macOS 用系统对话框；Windows 用 MessageBox。
 - 默认策略含常见娱乐软件/站点示例（含 WeGame：进程 `wegame`，域名 `wegame.qq.com` / `wegame.com`），可按学校实际修改。升级或重启服务端后，若默认策略尚无上述项会自动补入；自定义策略需在策略页手动添加。
+
+### 自动结束黑名单（定时查杀）
+
+在 Web「策略」页分组配置，保存后随心跳下发；Agent 用**独立 ticker** 扫描（不依赖心跳偶发）：
+
+| 字段 | 含义 |
+|------|------|
+| `kill_blacklisted` | 总开关（旧值 `true` 仍表示开启） |
+| `kill_scan_interval_sec` | 扫描间隔，默认 10，下限 3；界面可选 5/10/30/60 秒 |
+| `kill_schedule_mode` | `all_day` 或 `windows` |
+| `kill_schedule_windows` | 多个「星期几 + 起止时间」，本地时区 |
+| `kill_actions` | 可组合：`kill` / `warn` / `alert`；空且已开启时默认 `kill+alert` |
+| `kill_warn_message` / `kill_warn_countdown_sec` | 警告文案（`{name}` `{pid}` `{sec}`）与倒计时 |
+| `kill_cooldown_sec` | 同进程名冷却，默认 60 秒 |
+
+仅勾选 `alert` 不上报杀；勾选 `warn`+`kill` 时先弹窗再倒计时结束进程。

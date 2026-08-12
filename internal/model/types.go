@@ -140,6 +140,16 @@ type Alert struct {
 	Acked     bool      `json:"acked"`
 }
 
+// KillTimeWindow is a weekly recurring local-time window for blacklist enforcement.
+// Weekdays use Go's time.Weekday: 0=Sunday … 6=Saturday.
+// Start/End are "HH:MM" in the machine's local timezone. If End <= Start, the
+// window spans midnight (e.g. 22:00–06:00).
+type KillTimeWindow struct {
+	Weekdays []int  `json:"weekdays"`
+	Start    string `json:"start"`
+	End      string `json:"end"`
+}
+
 // Policy defines enforcement rules pushed to agents.
 type Policy struct {
 	ID                   string   `json:"id"`
@@ -149,15 +159,33 @@ type Policy struct {
 	ProcessWhitelistMode bool     `json:"process_whitelist_mode"`
 	ProcessWhitelist     []string `json:"process_whitelist"`
 	DomainBlacklist      []string `json:"domain_blacklist"`
-	KillBlacklisted      bool     `json:"kill_blacklisted"`
-	MaxCPUPercent        float64  `json:"max_cpu_percent"`
-	MaxMemPercent        float64  `json:"max_mem_percent"`
-	MaxDiskPercent       float64  `json:"max_disk_percent"`
-	BlockUSBStorage      bool     `json:"block_usb_storage"`
-	AllowShutdown        bool     `json:"allow_shutdown"`
-	CollectIntervalSec   int      `json:"collect_interval_sec"`
-	ReportTopNProcesses  int      `json:"report_top_n_processes"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	// KillBlacklisted is the master switch for automatic blacklist enforcement.
+	// Legacy: true means enable kill (and alert) with defaults below.
+	KillBlacklisted bool `json:"kill_blacklisted"`
+	// KillScanIntervalSec is the dedicated scan ticker (independent of heartbeat).
+	// Default 10; minimum 3.
+	KillScanIntervalSec int `json:"kill_scan_interval_sec,omitempty"`
+	// KillScheduleMode: "all_day" (default) or "windows".
+	KillScheduleMode string `json:"kill_schedule_mode,omitempty"`
+	// KillScheduleWindows is used when KillScheduleMode == "windows".
+	KillScheduleWindows []KillTimeWindow `json:"kill_schedule_windows,omitempty"`
+	// KillActions is a set of "kill", "warn", "alert". Empty + KillBlacklisted
+	// means ["kill","alert"] for backward compatibility.
+	KillActions []string `json:"kill_actions,omitempty"`
+	// KillWarnMessage supports {name}, {pid}, {sec} placeholders.
+	KillWarnMessage string `json:"kill_warn_message,omitempty"`
+	// KillWarnCountdownSec waits after warning (or before kill when warn is set). Default 10.
+	KillWarnCountdownSec int `json:"kill_warn_countdown_sec,omitempty"`
+	// KillCooldownSec suppresses repeat warn/kill/alert for the same process name. Default 60.
+	KillCooldownSec int `json:"kill_cooldown_sec,omitempty"`
+	MaxCPUPercent       float64 `json:"max_cpu_percent"`
+	MaxMemPercent       float64 `json:"max_mem_percent"`
+	MaxDiskPercent      float64 `json:"max_disk_percent"`
+	BlockUSBStorage     bool    `json:"block_usb_storage"`
+	AllowShutdown       bool    `json:"allow_shutdown"`
+	CollectIntervalSec  int     `json:"collect_interval_sec"`
+	ReportTopNProcesses int     `json:"report_top_n_processes"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // Command is a remote action for an agent.

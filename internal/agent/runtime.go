@@ -27,10 +27,12 @@ type Runtime struct {
 	enforcer   *Enforcer
 	client     *Client
 	updater    *Updater
+	killer     *killScheduler
 
-	mu        sync.Mutex
-	cancel    context.CancelFunc
-	logCloser io.Closer
+	mu           sync.Mutex
+	cancel       context.CancelFunc
+	logCloser    io.Closer
+	pendingAlert []model.Alert
 }
 
 func NewRuntime(cfg config.AgentConfig, configPath string) (*Runtime, error) {
@@ -52,6 +54,7 @@ func NewRuntime(cfg config.AgentConfig, configPath string) (*Runtime, error) {
 		client:     client,
 		updater:    NewUpdater(client, configPath),
 	}
+	rt.killer = newKillScheduler(rt)
 	if err := rt.setupLog(); err != nil {
 		return nil, err
 	}
@@ -88,6 +91,9 @@ func (r *Runtime) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	r.cancel = cancel
 	go r.loop(ctx)
+	if r.killer != nil {
+		go r.killer.loop(ctx)
+	}
 	log.Printf("proctor-agent started id=%s server=%s", r.cfg.AgentID, r.cfg.ServerURL)
 	return nil
 }
@@ -150,6 +156,9 @@ func (r *Runtime) tick() {
 		return
 	}
 	alerts := r.enforcer.Evaluate(&hb)
+	if queued := r.drainAlerts(); len(queued) > 0 {
+		alerts = append(alerts, queued...)
+	}
 	hb.Alerts = alerts
 
 	newPolicy, cmds, fsJobs, shells, err := r.client.Heartbeat(hb)
@@ -342,6 +351,26 @@ func (r *Runtime) handleTeacherMessage(cmd model.Command, msg string, allowReply
 	if err := r.client.ReportCommand(result); err != nil {
 		log.Printf("report command failed: %v", err)
 	}
+}
+
+func (r *Runtime) queueAlert(a model.Alert) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.pendingAlert) >= 200 {
+		r.pendingAlert = r.pendingAlert[len(r.pendingAlert)-199:]
+	}
+	r.pendingAlert = append(r.pendingAlert, a)
+}
+
+func (r *Runtime) drainAlerts() []model.Alert {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.pendingAlert) == 0 {
+		return nil
+	}
+	out := r.pendingAlert
+	r.pendingAlert = nil
+	return out
 }
 
 func payloadBoolDefault(payload map[string]string, key string, def bool) bool {

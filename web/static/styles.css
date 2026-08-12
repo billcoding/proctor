@@ -407,6 +407,74 @@ button.badge.linkish:hover {
 .form-grid { display: grid; gap: 12px; padding: 16px; }
 .form-grid label { display: grid; gap: 6px; font-size: 0.86rem; color: var(--muted); font-weight: 560; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-section {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 14px 12px;
+  background: #f7f9fc;
+  display: grid;
+  gap: 12px;
+}
+.form-section > h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: var(--text);
+}
+.form-section .section-hint {
+  margin: -4px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.weekday-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.weekday-grid label.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 560;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.weekday-grid label.chip input { margin: 0; }
+.kill-windows { display: grid; gap: 10px; }
+.kill-window-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.kill-window-row .window-times {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+.action-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.action-checks label {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  color: var(--text);
+  font-weight: 560;
+  grid-template-columns: none !important;
+}
 .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 0.82rem; }
 
 .refresh-ctl {

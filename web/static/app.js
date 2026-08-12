@@ -1770,6 +1770,103 @@ async function loadPolicies() {
   renderPolicyForm();
 }
 
+const WEEKDAY_LABELS = [
+  { v: 1, t: "周一" },
+  { v: 2, t: "周二" },
+  { v: 3, t: "周三" },
+  { v: 4, t: "周四" },
+  { v: 5, t: "周五" },
+  { v: 6, t: "周六" },
+  { v: 0, t: "周日" },
+];
+
+function killActionsOf(p) {
+  const raw = Array.isArray(p.kill_actions) ? p.kill_actions : [];
+  if (!raw.length && p.kill_blacklisted) return ["kill", "alert"];
+  return raw.map((x) => String(x).toLowerCase());
+}
+
+function killWindowsOf(p) {
+  const wins = Array.isArray(p.kill_schedule_windows) ? p.kill_schedule_windows : [];
+  if (wins.length) return wins;
+  return [{ weekdays: [1, 2, 3, 4, 5], start: "08:00", end: "17:30" }];
+}
+
+function renderWeekdayChips(namePrefix, selected) {
+  const set = new Set((selected || []).map(Number));
+  return `<div class="weekday-grid">${WEEKDAY_LABELS.map(
+    (d) =>
+      `<label class="chip"><input type="checkbox" name="${namePrefix}" value="${d.v}" ${set.has(d.v) ? "checked" : ""} />${d.t}</label>`,
+  ).join("")}</div>`;
+}
+
+function renderKillWindows(wins) {
+  return wins
+    .map(
+      (w, i) => `
+      <div class="kill-window-row" data-idx="${i}">
+        ${renderWeekdayChips(`kill_wd_${i}`, w.weekdays || [])}
+        <div class="window-times">
+          <label>开始<input type="time" name="kill_start_${i}" value="${escAttr(w.start || "08:00")}" /></label>
+          <label>结束<input type="time" name="kill_end_${i}" value="${escAttr(w.end || "17:30")}" /></label>
+          <button type="button" class="ghost" data-rm-window="${i}">删除</button>
+        </div>
+      </div>`,
+    )
+    .join("");
+}
+
+function bindKillPolicyFormUI() {
+  const form = $("#policyForm");
+  if (!form) return;
+  const modeSel = form.querySelector('[name="kill_schedule_mode"]');
+  const windowsBox = form.querySelector("#killWindowsBox");
+  const syncMode = () => {
+    if (!windowsBox || !modeSel) return;
+    windowsBox.style.display = modeSel.value === "windows" ? "grid" : "none";
+  };
+  modeSel?.addEventListener("change", syncMode);
+  syncMode();
+
+  form.querySelector("#addKillWindow")?.addEventListener("click", () => {
+    const box = form.querySelector("#killWindowsList");
+    if (!box) return;
+    const idx = box.querySelectorAll(".kill-window-row").length;
+    const html = renderKillWindows([{ weekdays: [1, 2, 3, 4, 5], start: "08:00", end: "17:30" }]);
+    // renderKillWindows always emits index 0; remap to next free index.
+    const remapped = html
+      .replaceAll("kill_wd_0", `kill_wd_${idx}`)
+      .replaceAll("kill_start_0", `kill_start_${idx}`)
+      .replaceAll("kill_end_0", `kill_end_${idx}`)
+      .replaceAll('data-idx="0"', `data-idx="${idx}"`)
+      .replaceAll('data-rm-window="0"', `data-rm-window="${idx}"`);
+    box.insertAdjacentHTML("beforeend", remapped);
+  });
+
+  form.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-rm-window]");
+    if (!btn) return;
+    const row = btn.closest(".kill-window-row");
+    const list = form.querySelector("#killWindowsList");
+    if (!row || !list) return;
+    if (list.querySelectorAll(".kill-window-row").length <= 1) {
+      alert("至少保留一个时段");
+      return;
+    }
+    row.remove();
+  });
+}
+
+function collectKillWindows(form) {
+  const rows = [...form.querySelectorAll(".kill-window-row")];
+  return rows.map((row) => {
+    const weekdays = [...row.querySelectorAll('input[type="checkbox"]:checked')].map((el) => Number(el.value));
+    const start = row.querySelector('input[type="time"][name^="kill_start_"]')?.value || "08:00";
+    const end = row.querySelector('input[type="time"][name^="kill_end_"]')?.value || "17:30";
+    return { weekdays, start, end };
+  });
+}
+
 function renderPolicyForm() {
   const p = state.policies.find((x) => x.id === state.selectedPolicyId);
   state.policy = p;
@@ -1777,6 +1874,10 @@ function renderPolicyForm() {
     $("#policyForm").innerHTML = '<div class="empty">选择策略</div>';
     return;
   }
+  const actions = killActionsOf(p);
+  const scheduleMode = p.kill_schedule_mode === "windows" ? "windows" : "all_day";
+  const wins = killWindowsOf(p);
+  const warnMsg = p.kill_warn_message || "检测到违规进程「{name}」(pid={pid})，将在 {sec} 秒后结束。";
   $("#policyForm").innerHTML = `
     <div class="form-row">
       <label>名称<input name="name" value="${escAttr(p.name || "")}" /></label>
@@ -1794,18 +1895,68 @@ function renderPolicyForm() {
     </div>
     <div class="form-row">
       <label>磁盘告警阈值%<input name="max_disk_percent" type="number" value="${p.max_disk_percent || 92}" /></label>
-      <label>自动结束违规进程
-        <select name="kill_blacklisted"><option value="true" ${p.kill_blacklisted ? "selected" : ""}>是</option><option value="false" ${!p.kill_blacklisted ? "selected" : ""}>否</option></select>
-      </label>
-    </div>
-    <div class="form-row">
       <label>白名单模式（仅允许列表内进程）
         <select name="process_whitelist_mode"><option value="false" ${!p.process_whitelist_mode ? "selected" : ""}>否</option><option value="true" ${p.process_whitelist_mode ? "selected" : ""}>是</option></select>
       </label>
+    </div>
+    <div class="form-row">
       <label>允许远程关机/重启
         <select name="allow_shutdown"><option value="true" ${p.allow_shutdown !== false ? "selected" : ""}>是</option><option value="false" ${p.allow_shutdown === false ? "selected" : ""}>否</option></select>
       </label>
     </div>
+
+    <div class="form-section">
+      <h3>自动结束黑名单进程</h3>
+      <p class="section-hint">独立于心跳的定时扫描；使用学生机本地时区。旧策略仅开启开关时，默认「结束进程 + 上报告警」。</p>
+      <div class="form-row">
+        <label>启用自动查杀
+          <select name="kill_blacklisted"><option value="true" ${p.kill_blacklisted ? "selected" : ""}>是</option><option value="false" ${!p.kill_blacklisted ? "selected" : ""}>否</option></select>
+        </label>
+        <label>扫描间隔
+          <select name="kill_scan_interval_sec">
+            ${(() => {
+              const cur = Number(p.kill_scan_interval_sec) || 10;
+              const opts = [5, 10, 30, 60];
+              if (!opts.includes(cur) && cur >= 3) opts.unshift(cur);
+              return opts.map((n) => `<option value="${n}" ${cur === n ? "selected" : ""}>${n < 60 ? n + " 秒" : Math.round(n / 60) + " 分钟"}</option>`).join("");
+            })()}
+          </select>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>冷却（同进程名 N 秒内不重复处理）
+          <input name="kill_cooldown_sec" type="number" min="0" value="${p.kill_cooldown_sec || 60}" />
+        </label>
+        <label>生效时段
+          <select name="kill_schedule_mode">
+            <option value="all_day" ${scheduleMode === "all_day" ? "selected" : ""}>全天</option>
+            <option value="windows" ${scheduleMode === "windows" ? "selected" : ""}>指定星期 + 每日时段</option>
+          </select>
+        </label>
+      </div>
+      <div id="killWindowsBox" class="kill-windows">
+        <div id="killWindowsList">${renderKillWindows(wins)}</div>
+        <div><button type="button" class="ghost" id="addKillWindow">添加时段</button></div>
+        <p class="section-hint">结束时间早于开始时间时视为跨午夜（如 22:00–06:00）。</p>
+      </div>
+      <div>
+        <div class="section-hint" style="margin-bottom:6px">动作（可多选）</div>
+        <div class="action-checks">
+          <label><input type="checkbox" name="kill_action_kill" ${actions.includes("kill") ? "checked" : ""} />结束进程</label>
+          <label><input type="checkbox" name="kill_action_warn" ${actions.includes("warn") ? "checked" : ""} />结束前弹窗警告</label>
+          <label><input type="checkbox" name="kill_action_alert" ${actions.includes("alert") ? "checked" : ""} />上报告警</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>警告倒计时（秒）
+          <input name="kill_warn_countdown_sec" type="number" min="0" value="${p.kill_warn_countdown_sec || 10}" />
+        </label>
+        <label>警告文案（可用 {name} {pid} {sec}）
+          <input name="kill_warn_message" value="${escAttr(warnMsg)}" />
+        </label>
+      </div>
+    </div>
+
     <label>进程黑名单（逗号分隔）
       <textarea name="process_blacklist" rows="3">${escAttr((p.process_blacklist || []).join(", "))}</textarea>
     </label>
@@ -1817,12 +1968,22 @@ function renderPolicyForm() {
     </label>
     <div class="muted">策略 ID：<span class="mono">${esc(p.id)}</span></div>
   `;
+  bindKillPolicyFormUI();
 }
 
 async function savePolicy() {
   if (!state.policy) return;
-  const fd = new FormData($("#policyForm"));
+  const form = $("#policyForm");
+  const fd = new FormData(form);
   const split = (s) => String(s || "").split(/[,，\n]/).map((x) => x.trim()).filter(Boolean);
+  const killActions = [];
+  if (form.querySelector('[name="kill_action_kill"]')?.checked) killActions.push("kill");
+  if (form.querySelector('[name="kill_action_warn"]')?.checked) killActions.push("warn");
+  if (form.querySelector('[name="kill_action_alert"]')?.checked) killActions.push("alert");
+  if (fd.get("kill_blacklisted") === "true" && killActions.length === 0) {
+    alert("已启用自动查杀时，请至少勾选一个动作（结束进程 / 弹窗警告 / 上报告警）");
+    return;
+  }
   const body = {
     ...state.policy,
     name: fd.get("name"),
@@ -1833,6 +1994,13 @@ async function savePolicy() {
     max_mem_percent: Number(fd.get("max_mem_percent")),
     max_disk_percent: Number(fd.get("max_disk_percent")),
     kill_blacklisted: fd.get("kill_blacklisted") === "true",
+    kill_scan_interval_sec: Number(fd.get("kill_scan_interval_sec")),
+    kill_schedule_mode: fd.get("kill_schedule_mode") || "all_day",
+    kill_schedule_windows: collectKillWindows(form),
+    kill_actions: killActions,
+    kill_warn_message: String(fd.get("kill_warn_message") || "").trim(),
+    kill_warn_countdown_sec: Number(fd.get("kill_warn_countdown_sec")),
+    kill_cooldown_sec: Number(fd.get("kill_cooldown_sec")),
     process_whitelist_mode: fd.get("process_whitelist_mode") === "true",
     allow_shutdown: fd.get("allow_shutdown") === "true",
     process_blacklist: split(fd.get("process_blacklist")),

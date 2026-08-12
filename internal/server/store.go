@@ -317,6 +317,11 @@ func (s *Store) ensureDefaultPolicy() error {
 		p := model.Policy{
 			ID: "default", Name: "默认课堂策略", Enabled: true,
 			KillBlacklisted: true, AllowShutdown: true,
+			KillScanIntervalSec:  model.DefaultKillScanIntervalSec,
+			KillScheduleMode:     model.KillScheduleAllDay,
+			KillActions:          []string{model.KillActionKill, model.KillActionAlert},
+			KillWarnCountdownSec: model.DefaultKillWarnCountdownSec,
+			KillCooldownSec:      model.DefaultKillCooldownSec,
 			MaxCPUPercent: 95, MaxMemPercent: 95, MaxDiskPercent: 92,
 			CollectIntervalSec: 5, ReportTopNProcesses: 30,
 			ProcessBlacklist: []string{"steam", "epicgameslauncher", "discord", "qqmusic", "bilibili", "douyin", "minecraft", "wegame"},
@@ -525,6 +530,7 @@ func (s *Store) AckAlert(id string) error {
 }
 
 func (s *Store) SavePolicy(p model.Policy) error {
+	model.NormalizeKillPolicy(&p)
 	p.UpdatedAt = time.Now().UTC()
 	body, err := json.Marshal(p)
 	if err != nil {
@@ -556,6 +562,7 @@ func (s *Store) GetPolicy(id string) (model.Policy, error) {
 			p.AllowShutdown = true
 		}
 	}
+	model.NormalizeKillPolicy(&p)
 	return p, nil
 }
 
@@ -575,6 +582,7 @@ func (s *Store) ListPolicies() ([]model.Policy, error) {
 		if err := json.Unmarshal([]byte(body), &p); err != nil {
 			return nil, err
 		}
+		model.NormalizeKillPolicy(&p)
 		out = append(out, p)
 	}
 	return out, rows.Err()

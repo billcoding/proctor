@@ -2,7 +2,6 @@ package agent
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -24,16 +23,21 @@ type Enforcer struct {
 func NewEnforcer() *Enforcer {
 	return &Enforcer{
 		policy: model.Policy{
-			ID:                  "default",
-			Name:                "default",
-			Enabled:             true,
-			KillBlacklisted:     true,
-			AllowShutdown:       true,
-			MaxCPUPercent:       95,
-			MaxMemPercent:       95,
-			MaxDiskPercent:      95,
-			CollectIntervalSec:  5,
-			ReportTopNProcesses: 30,
+			ID:                   "default",
+			Name:                 "default",
+			Enabled:              true,
+			KillBlacklisted:      true,
+			KillScanIntervalSec:  model.DefaultKillScanIntervalSec,
+			KillScheduleMode:     model.KillScheduleAllDay,
+			KillActions:          []string{model.KillActionKill, model.KillActionAlert},
+			KillWarnCountdownSec: model.DefaultKillWarnCountdownSec,
+			KillCooldownSec:      model.DefaultKillCooldownSec,
+			AllowShutdown:        true,
+			MaxCPUPercent:        95,
+			MaxMemPercent:        95,
+			MaxDiskPercent:       95,
+			CollectIntervalSec:   5,
+			ReportTopNProcesses:  30,
 			ProcessBlacklist: []string{
 				"steam", "epicgameslauncher", "discord", "qqmusic",
 				"bilibili", "douyin", "tiktok", "minecraft", "wegame",
@@ -47,6 +51,7 @@ func NewEnforcer() *Enforcer {
 }
 
 func (e *Enforcer) SetPolicy(p model.Policy) {
+	model.NormalizeKillPolicy(&p)
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.policy = p
@@ -118,18 +123,16 @@ func (e *Enforcer) Evaluate(hb *model.HeartbeatPayload) []model.Alert {
 			continue
 		}
 
+		// When auto-enforcement is on, the dedicated kill scheduler owns
+		// warn/kill/alert so heartbeat does not duplicate or bypass schedule.
+		if p.KillBlacklisted {
+			continue
+		}
 		alerts = append(alerts, model.Alert{
 			ID: common.NewID("al"), AgentID: hb.AgentID, Level: "critical", Category: "process",
 			Message: fmt.Sprintf("检测到违规进程(%s): %s (pid=%d)", reason, proc.Name, proc.PID),
 			Detail:  proc.Cmdline, CreatedAt: now,
 		})
-		if p.KillBlacklisted {
-			if err := KillProcess(proc.PID); err != nil {
-				log.Printf("kill process %d (%s): %v", proc.PID, proc.Name, err)
-			} else {
-				log.Printf("killed process %d (%s) reason=%s", proc.PID, proc.Name, reason)
-			}
-		}
 	}
 
 	if len(p.DomainBlacklist) > 0 {
